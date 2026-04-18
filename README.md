@@ -104,8 +104,8 @@ project/
 ## 1. Clone repository
 
 ```bash
-git clone https://github.com/yourusername/student-assistant-chatbot.git
-cd student-assistant-chatbot
+git clone https://github.com/Poornima-Jayadevan/agentic-ai-student-assistant.git
+cd agentic-ai-student-assistant
 ```
 
 ## 2. Create virtual environment
@@ -168,9 +168,9 @@ http://127.0.0.1:8000/docs
 
 ![Chat UI](screenshots/chat-ui.png)
 
-## PDF Upload
+## Sidebar Tools
 
-![Upload](screenshots/upload.png)
+![sidebar-tools](screenshots/sidebar-tools.png)
 
 ## RAG Search
 
