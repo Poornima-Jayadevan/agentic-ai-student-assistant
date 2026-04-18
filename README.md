@@ -1,4 +1,4 @@
-# Student Assistant Chatbot
+# Agentic AI Student Assistant
 
 An AI-powered chatbot built with **FastAPI**, **Ollama**, **FAISS**, and **Sentence Transformers** that supports:
 
