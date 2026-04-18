@@ -10,3 +10,6 @@ data/vectorstore/*
 
 !data/uploads/.gitkeep
 !data/vectorstore/.gitkeep
+
+data/chunks/*
+!data/chunks/.gitkeep
