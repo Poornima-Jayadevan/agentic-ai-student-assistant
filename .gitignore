@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+venv/
+.env
+.idea/
+.vscode/
+
+data/uploads/*
+data/vectorstore/*
+
+!data/uploads/.gitkeep
+!data/vectorstore/.gitkeep
