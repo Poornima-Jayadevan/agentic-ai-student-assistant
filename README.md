@@ -1,6 +1,6 @@
 # Agentic AI Student Assistant
 
-An AI-powered chatbot built with **FastAPI**, **Ollama**, **FAISS**, and **Sentence Transformers** that supports:
+An Agentic AI assistant built with FastAPI, Ollama, FAISS, and Sentence Transformers that supports:
 
 - Conversational AI chat
 - PDF upload and document understanding
@@ -114,7 +114,7 @@ cd agentic-ai-student-assistant
 python -m venv venv
 ```
 
-## 3. Activate
+## 3. Activate Virtual Environment
 
 ### Windows
 
