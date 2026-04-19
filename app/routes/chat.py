@@ -7,6 +7,7 @@ from app.services.llm_service import (
     summarize_section_with_llm,
     explain_search_results
 )
+from app.services.langchain_service import get_langchain_response
 from app.services.memory_service import (
     get_memory,
     add_message,
@@ -266,6 +267,9 @@ def format_tool_response(tool_result: dict) -> str:
 
 @router.post("/chat")
 def chat(request: ChatRequest):
+    """
+    Original chatbot route using existing llm_service.
+    """
     try:
         user_id = request.user_id
         user_message = request.message.strip()
@@ -511,6 +515,279 @@ def chat(request: ChatRequest):
             "reply": reply,
             "retrieved_chunks": retrieved_chunks,
             "memory": get_user_profile(user_id)
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/chat-langchain")
+def chat_langchain(request: ChatRequest):
+    """
+    New LangChain chatbot route.
+    Keeps all your existing app logic, but swaps the final LLM response
+    generation to use LangChain.
+    """
+    try:
+        user_id = request.user_id
+        user_message = request.message.strip()
+        file_name = request.file_name.strip() if request.file_name else ""
+
+        # Store user message in short-term memory
+        add_message(user_id, "user", user_message)
+
+        # -----------------------------------
+        # 0. LONG-TERM MEMORY UPDATE DETECTION
+        # -----------------------------------
+        memory_update = detect_memory_update(user_message)
+        if memory_update:
+            update_user_profile(user_id, memory_update)
+
+            saved_items = ", ".join(
+                [f"{key}: {value}" for key, value in memory_update.items()]
+            )
+            reply = f"I saved this to memory: {saved_items}"
+
+            add_message(user_id, "assistant", reply)
+
+            return {
+                "mode": "memory_update",
+                "memory": get_user_profile(user_id),
+                "reply": reply
+            }
+
+        # -----------------------------
+        # 1. TOOL DETECTION
+        # -----------------------------
+        tool_result = detect_and_run_tool(user_message)
+
+        if tool_result:
+            reply = format_tool_response(tool_result)
+            add_message(user_id, "assistant", reply)
+
+            return {
+                "mode": "tool",
+                "tool_output": tool_result,
+                "reply": reply
+            }
+
+        # -----------------------------
+        # 2. JOB ASSISTANT DETECTION
+        # -----------------------------
+        job_command = detect_job_command(user_message)
+
+        if job_command == "summarize_job_description":
+            reply = summarize_job_description()
+            add_message(user_id, "assistant", reply)
+
+            return {
+                "mode": "job_assistant",
+                "task": job_command,
+                "reply": reply
+            }
+
+        if job_command == "compare_cv_with_job":
+            reply = compare_cv_with_job()
+            add_message(user_id, "assistant", reply)
+
+            return {
+                "mode": "job_assistant",
+                "task": job_command,
+                "reply": reply
+            }
+
+        if job_command == "identify_missing_skills":
+            reply = identify_missing_skills()
+            add_message(user_id, "assistant", reply)
+
+            return {
+                "mode": "job_assistant",
+                "task": job_command,
+                "reply": reply
+            }
+
+        if job_command == "generate_cover_letter":
+            reply = generate_cover_letter()
+            add_message(user_id, "assistant", reply)
+
+            return {
+                "mode": "job_assistant",
+                "task": job_command,
+                "reply": reply
+            }
+
+        if job_command == "generate_interview_questions":
+            reply = generate_interview_questions()
+            add_message(user_id, "assistant", reply)
+
+            return {
+                "mode": "job_assistant",
+                "task": job_command,
+                "reply": reply
+            }
+
+        # -----------------------------
+        # 3. DOCUMENT COMMAND DETECTION
+        # -----------------------------
+        command = detect_document_command(user_message)
+
+        # If file_name is not provided, try latest available processed doc
+        if not file_name:
+            docs = list_documents()
+            if docs:
+                file_name = docs[-1]
+
+        # -----------------------------
+        # 4. FULL DOCUMENT SUMMARIZATION
+        # -----------------------------
+        if command and command["type"] == "summarize_document":
+            if not file_name:
+                raise ValueError("No document available. Please upload a PDF first.")
+
+            doc_text = summarize_document(file_name)
+
+            if not doc_text:
+                raise ValueError(f"Could not summarize document '{file_name}'.")
+
+            summary = summarize_with_llm(doc_text)
+
+            add_message(user_id, "assistant", summary)
+
+            return {
+                "mode": "summarize_document",
+                "file_name": file_name,
+                "reply": summary
+            }
+
+        # -----------------------------
+        # 5. SECTION / CHAPTER SUMMARY
+        # -----------------------------
+        if command and command["type"] == "summarize_section":
+            if not file_name:
+                raise ValueError("No document available. Please upload a PDF first.")
+
+            result = summarize_section(file_name, command["section"])
+
+            if not result:
+                doc_text = summarize_document(file_name)
+
+                if not doc_text:
+                    raise ValueError(f"Could not summarize document '{file_name}'.")
+
+                summary = summarize_with_llm(doc_text)
+                final_reply = (
+                    f"I couldn't find a matching section for '{command['section']}', "
+                    f"so here is a summary of the full document instead.\n\n{summary}"
+                )
+
+                add_message(user_id, "assistant", final_reply)
+
+                return {
+                    "mode": "summarize_document",
+                    "file_name": file_name,
+                    "reply": final_reply
+                }
+
+            summary = summarize_section_with_llm(
+                section_title=result["title"],
+                text=result["content"]
+            )
+
+            final_reply = f"**Summary of {result['title']}:**\n\n{summary}"
+
+            add_message(user_id, "assistant", final_reply)
+
+            return {
+                "mode": "summarize_section",
+                "file_name": file_name,
+                "section": result["title"],
+                "reply": final_reply
+            }
+
+        # -----------------------------
+        # 6. KEYWORD / DOCUMENT SEARCH
+        # -----------------------------
+        if command and command["type"] == "keyword_search":
+            keyword = command["keyword"]
+
+            if file_name:
+                matches = search_document(file_name, keyword, max_results=5)
+
+                if matches is None:
+                    raise ValueError(f"Document '{file_name}' was not found.")
+
+                reply = explain_search_results(keyword, matches)
+
+                add_message(user_id, "assistant", reply)
+
+                return {
+                    "mode": "keyword_search",
+                    "file_name": file_name,
+                    "keyword": keyword,
+                    "reply": reply,
+                    "matches": matches
+                }
+
+            matches = search_all_documents(keyword, max_results=5)
+            reply = explain_search_results(keyword, matches)
+
+            add_message(user_id, "assistant", reply)
+
+            return {
+                "mode": "keyword_search_all_documents",
+                "keyword": keyword,
+                "reply": reply,
+                "matches": matches
+            }
+
+        # -----------------------------
+        # 7. NORMAL RAG / LANGCHAIN QA
+        # -----------------------------
+        messages = get_memory(user_id)
+
+        retrieved_chunks = []
+        context = ""
+
+        if file_name:
+            retrieved_chunks = retrieve_relevant_chunks(
+                query=user_message,
+                file_name=file_name,
+                top_k=3
+            )
+
+            context = "\n\n".join(
+                [chunk["text"] for chunk in retrieved_chunks if "text" in chunk]
+            )
+
+        user_profile = get_user_profile(user_id)
+
+        enhanced_user_message = user_message
+        if context:
+            enhanced_user_message = (
+                f"Use the following document context to answer the user.\n\n"
+                f"Context:\n{context}\n\n"
+                f"User question:\n{user_message}"
+            )
+
+        if user_profile:
+            enhanced_user_message += f"\n\nUser profile:\n{user_profile}"
+
+        reply = get_langchain_response(
+            user_message=enhanced_user_message,
+            memory=messages
+        )
+
+        add_message(user_id, "assistant", reply)
+
+        return {
+            "mode": "langchain_rag_qa" if file_name else "langchain_chat",
+            "file_name": file_name if file_name else None,
+            "reply": reply,
+            "retrieved_chunks": retrieved_chunks,
+            "memory": user_profile
         }
 
     except ValueError as e:
