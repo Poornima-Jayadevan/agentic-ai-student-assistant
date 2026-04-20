@@ -78,6 +78,7 @@ from app.services.memory_service import clear_memory
 
 from app.models.schemas import ChatRequest
 from app.routes.chat import router as chat_router
+from app.routes.chat_agent import router as chat_agent_router
 from app.routes.upload import router as upload_router
 from app.routes.search import router as search_router
 from app.routes.tools import router as tools_router
@@ -91,6 +92,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 app.include_router(chat_router)
+app.include_router(chat_agent_router)
 app.include_router(documents.router)
 app.include_router(upload_router)
 app.include_router(search_router)

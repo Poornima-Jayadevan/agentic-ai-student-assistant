@@ -1,6 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
+from typing import Union
 
 load_dotenv()
 
@@ -132,19 +133,49 @@ def build_system_message(context: str = "", user_profile: dict | None = None) ->
     }
 
 
-def get_llm_response(messages: list, context: str = "", user_profile: dict | None = None) -> str:
+def normalize_messages(messages_or_prompt: Union[list, str]) -> list:
     """
-    Send conversation history to Ollama and optionally include retrieved
-    document context and user profile for more grounded/personalized answers.
+    Normalize input into Ollama/OpenAI-style message list.
+
+    Supports:
+    - list of messages
+    - plain string prompt
+    """
+    if isinstance(messages_or_prompt, list):
+        return messages_or_prompt
+
+    if isinstance(messages_or_prompt, str):
+        prompt = messages_or_prompt.strip()
+        if not prompt:
+            return []
+        return [{"role": "user", "content": prompt}]
+
+    raise ValueError("messages must be either a list of messages or a string prompt.")
+
+
+def get_llm_response(
+    messages: Union[list, str],
+    context: str = "",
+    user_profile: dict | None = None
+) -> str:
+    """
+    Send conversation history or a plain prompt to Ollama and optionally include
+    retrieved document context and user profile for more grounded/personalized answers.
 
     Args:
-        messages (list): Chat history in Ollama/OpenAI-style format
+        messages (list | str): Chat history in Ollama/OpenAI-style format,
+                               or a plain prompt string
         context (str): Retrieved document text to ground the response
         user_profile (dict | None): Stored user memory
 
     Returns:
         str: Assistant response text
     """
+    normalized_messages = normalize_messages(messages)
+
+    if not normalized_messages:
+        return "No valid input was provided to the language model."
+
     system_message = build_system_message(context=context, user_profile=user_profile)
 
     full_messages = [system_message]
@@ -156,7 +187,7 @@ def get_llm_response(messages: list, context: str = "", user_profile: dict | Non
         }
         full_messages.append(context_message)
 
-    full_messages.extend(messages)
+    full_messages.extend(normalized_messages)
 
     return call_ollama(full_messages)
 
@@ -221,9 +252,9 @@ def summarize_section_with_llm(section_title: str, text: str) -> str:
                 "Write in short paragraphs. "
                 "Use markdown bold labels when useful. "
                 "Focus only on the content of this section. "
-                "Do not invent details that are not present in the text."
-                "Do NOT assume the candidate meets all requirements."
-                "Do NOT copy years of experience from the job description."
+                "Do not invent details that are not present in the text. "
+                "Do NOT assume the candidate meets all requirements. "
+                "Do NOT copy years of experience from the job description. "
                 "Base the response ONLY on the CV."
             )
         },

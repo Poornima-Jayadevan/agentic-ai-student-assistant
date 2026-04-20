@@ -150,6 +150,7 @@ def retrieve_relevant_chunks(query: str, file_name: str, top_k: int = 3) -> List
     doc = document_store.get(normalized_name)
 
     if not doc:
+        print("Available documents:", list(document_store.keys()))
         raise ValueError(f"Document '{normalized_name}' not found.")
 
     chunks = doc.get("chunks", [])
