@@ -7,7 +7,7 @@ import operator
 from typing import Optional
 
 from app.services.retriever_service import build_context
-
+import re
 
 # -----------------------------
 # Calculator Tool
@@ -109,19 +109,20 @@ def retriever_tool(query: str, file_name: str, top_k: int = 3) -> str:
 # -----------------------------
 
 def looks_like_calculation(message: str) -> bool:
-    """
-    Simple detection for math-like input.
-    """
-    msg = message.strip().lower()
+    msg = message.lower().strip()
 
-    math_keywords = ["calculate", "compute", "solve", "what is"]
-    math_symbols = set("0123456789+-*/%.()")
-
-    if any(keyword in msg for keyword in math_keywords):
+    # direct math expression
+    if re.fullmatch(r"\d+(\.\d+)?\s*[\+\-\*\/%]\s*\d+(\.\d+)?", msg):
         return True
 
-    cleaned = msg.replace(" ", "")
-    return cleaned != "" and all(ch in math_symbols for ch in cleaned)
+    # text requests with numbers
+    if re.search(r"\b(calculate|solve)\b", msg):
+        return True
+
+    if re.search(r"what is\s+\d+(\.\d+)?\s*[\+\-\*\/%]\s*\d+(\.\d+)?", msg):
+        return True
+
+    return False
 
 
 def looks_like_document_query(message: str) -> bool:

@@ -31,6 +31,8 @@ from app.services.job_assistant_service import (
     generate_interview_questions
 )
 
+from app.services.agent_service import route_message
+
 router = APIRouter()
 
 
