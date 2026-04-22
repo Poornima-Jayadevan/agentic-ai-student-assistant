@@ -9,10 +9,6 @@ from app.services.embedding_service import get_embeddings, get_query_embedding
 from app.services.vector_store_service import save_faiss_index, search_faiss
 
 
-#from app.services.rag_service import retrieve_relevant_chunks
-#from app.services.llm_service import get_llm_response
-
-
 document_store: Dict[str, Dict[str, Any]] = {}
 
 
@@ -37,7 +33,20 @@ def normalize_document_type(document_type: str) -> str:
 
 
 def clean_text(text: str) -> str:
-    return " ".join(text.split())
+    """
+    Clean text while preserving line breaks.
+    This is important for section detection in CVs and job descriptions.
+    """
+    if not text:
+        return ""
+
+    cleaned_lines = []
+    for line in text.splitlines():
+        line = re.sub(r"\s+", " ", line).strip()
+        if line:
+            cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines)
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
@@ -49,7 +58,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         if page_text:
             full_text.append(page_text)
 
-    raw_text = "\n".join(full_text)
+    raw_text = "\n\n".join(full_text)
     return clean_text(raw_text)
 
 
@@ -159,8 +168,6 @@ def retrieve_relevant_chunks(query: str, file_name: str, top_k: int = 3) -> List
 
     chunks = doc.get("chunks", [])
 
-    # For short keyword-like queries, require literal presence somewhere in the document.
-    # This fixes cases like 'asdhjklqwerty' returning unrelated CV chunks.
     if _query_looks_like_literal_keyword(query):
         if not _chunk_contains_query_term(chunks, query):
             return []
@@ -182,9 +189,6 @@ def retrieve_relevant_chunks(query: str, file_name: str, top_k: int = 3) -> List
 
     for item in results:
         score = item.get("score", 0)
-
-        # Keep only reasonably relevant results.
-        # Adjust this threshold later if needed based on your FAISS score behavior.
         if score >= 0.30:
             filtered_results.append(item)
 
@@ -226,7 +230,7 @@ def get_document(file_name: str) -> Optional[Dict]:
     return document_store.get(normalized_name)
 
 
-def summarize_document(file_name: str, max_chars: int = 4000) -> Optional[str]:
+def summarize_document(file_name: str, max_chars: int = 12000) -> Optional[str]:
     doc = get_document(file_name)
     if not doc:
         return None
@@ -242,25 +246,99 @@ def split_into_sections(text: str) -> List[Dict[str, str]]:
     if not text.strip():
         return []
 
-    pattern = r"(?im)(chapter\s+\d+\b.*?|^\d+[\.\)]?\s+[A-Z][^\n]*$)"
-    matches = list(re.finditer(pattern, text, flags=re.MULTILINE))
+    normalized_text = text
 
-    if not matches:
-        return [{"title": "Full Document", "content": text}]
+    # Force common CV / JD headings onto their own lines
+    heading_patterns = [
+        "SUMMARY",
+        "PROFILE",
+        "SKILLS",
+        "TECHNICAL SKILLS",
+        "WORK EXPERIENCE",
+        "EXPERIENCE",
+        "EDUCATION",
+        "MASTER’S THESIS",
+        "MASTER'S THESIS",
+        "PROJECTS",
+        "CERTIFICATIONS",
+        "LANGUAGES",
+        "ACHIEVEMENTS",
+        "RESPONSIBILITIES",
+        "REQUIREMENTS",
+        "QUALIFICATIONS",
+        "PREFERRED QUALIFICATIONS",
+        "JOB DESCRIPTION",
+        "OVERVIEW",
+    ]
 
+    for heading in sorted(heading_patterns, key=len, reverse=True):
+        normalized_text = re.sub(
+            rf"\s*{re.escape(heading)}\s*",
+            f"\n{heading}\n",
+            normalized_text,
+            flags=re.IGNORECASE
+        )
+
+    lines = [line.strip() for line in normalized_text.splitlines() if line.strip()]
     sections = []
 
-    for i, match in enumerate(matches):
-        start = match.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+    current_title = None
+    current_content = []
 
-        title = match.group().strip()
-        content = text[start:end].strip()
+    common_headings = {h.lower() for h in heading_patterns}
+    common_headings.update({
+        "about me",
+        "academic background",
+        "professional experience",
+        "employment history",
+        "interests",
+        "contact",
+    })
 
+    def is_heading(line: str) -> bool:
+        normalized = re.sub(r"\s+", " ", line).strip()
+
+        if not normalized:
+            return False
+
+        if len(normalized) > 80:
+            return False
+
+        if normalized.lower() in common_headings:
+            return True
+
+        if normalized.isupper() and len(normalized.split()) <= 6:
+            return True
+
+        if re.match(r"(?i)^chapter\s+\d+\b.*", normalized):
+            return True
+
+        if re.match(r"^\d+[\.\)]?\s+[A-Z][^\n]*$", normalized):
+            return True
+
+        return False
+
+    for line in lines:
+        if is_heading(line):
+            if current_title is not None:
+                sections.append({
+                    "title": current_title,
+                    "content": "\n".join(current_content).strip()
+                })
+
+            current_title = line
+            current_content = []
+        else:
+            current_content.append(line)
+
+    if current_title is not None:
         sections.append({
-            "title": title,
-            "content": content
+            "title": current_title,
+            "content": "\n".join(current_content).strip()
         })
+
+    if not sections:
+        return [{"title": "Full Document", "content": text}]
 
     return sections
 
@@ -280,21 +358,58 @@ def summarize_section(
 
     sections = split_into_sections(text)
     query = section_query.lower().strip()
+    query = re.sub(r"\s+", " ", query)
 
+    # Remove noisy prefixes from command parsing
+    for prefix in [
+        "the section ",
+        "section ",
+        "the chapter ",
+        "chapter ",
+    ]:
+        if query.startswith(prefix):
+            query = query[len(prefix):].strip()
+
+    # 1. Exact title match
     for section in sections:
-        if query in section["title"].lower():
+        title = section.get("title", "").lower().strip()
+        if query == title:
             return {
                 "title": section["title"],
                 "content": section["content"][:max_chars]
             }
 
+    # 2. Partial title match only
     for section in sections:
-        if query in section["content"].lower():
+        title = section.get("title", "").lower().strip()
+        if query in title or title in query:
             return {
                 "title": section["title"],
                 "content": section["content"][:max_chars]
             }
 
+    # 3. Common heading normalization
+    normalized_map = {
+        "education": ["education", "academic background"],
+        "skills": ["skills", "technical skills"],
+        "projects": ["projects"],
+        "work experience": ["work experience", "experience", "professional experience", "employment history"],
+        "summary": ["summary", "profile", "about me"],
+        "certifications": ["certifications"],
+        "languages": ["languages"],
+    }
+
+    for canonical, variants in normalized_map.items():
+        if query == canonical or query in variants:
+            for section in sections:
+                title = section.get("title", "").lower().strip()
+                if title in variants:
+                    return {
+                        "title": section["title"],
+                        "content": section["content"][:max_chars]
+                    }
+
+    # Do NOT guess from content anymore
     return None
 
 

@@ -153,7 +153,7 @@ def identify_missing_skills() -> str:
     return call_ollama(messages)
 
 
-def generate_cover_letter() -> str:
+def generate_cover_letter(file_name: str | None = None):
     """
     Generate a tailored and honest cover letter using the latest CV
     and the latest job description with multi-document RAG.
