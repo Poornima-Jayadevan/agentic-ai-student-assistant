@@ -5,7 +5,7 @@ from app.services.rag_service import (
     build_multi_doc_context
 )
 from app.services.llm_service import call_ollama
-
+from app.services.rag_service import list_documents
 
 def summarize_job_description() -> str:
     """
@@ -158,17 +158,37 @@ def generate_cover_letter(file_name: str | None = None):
     Generate a tailored and honest cover letter using the latest CV
     and the latest job description with multi-document RAG.
     """
+
+    # 1. Try type-based lookup first
     cv_file = get_latest_document_by_type("cv")
     jd_file = get_latest_document_by_type("job_description")
 
+    # 2. Fallback: infer from uploaded document names
+    if not cv_file or not jd_file:
+        docs = list_documents()
+
+        if docs:
+            docs_lower_map = {doc.lower(): doc for doc in docs}
+
+            if not cv_file:
+                for doc_lower, original_doc in docs_lower_map.items():
+                    if "cv" in doc_lower or "resume" in doc_lower:
+                        cv_file = original_doc
+                        break
+
+            if not jd_file:
+                for doc_lower, original_doc in docs_lower_map.items():
+                    if "job" in doc_lower or "description" in doc_lower or "jd" in doc_lower:
+                        jd_file = original_doc
+                        break
+
     if not cv_file:
         return "No CV document was found."
+
     if not jd_file:
         return "No job description document was found."
 
-    query = (
-        "Write a tailored cover letter using the candidate CV and the job description."
-    )
+    query = "Write a tailored cover letter using the candidate CV and the job description."
 
     results = retrieve_chunks_for_documents(
         query=query,
@@ -179,8 +199,24 @@ def generate_cover_letter(file_name: str | None = None):
     context = build_multi_doc_context(results, max_chars=6000)
 
     if not context.strip():
-        return "I could not retrieve enough relevant information from the CV and job description."
+        cv_text = summarize_document(cv_file)
+        jd_text = summarize_document(jd_file)
 
+        context = f"""
+    Candidate CV:
+    {cv_text[:3000]}
+
+    Job Description:
+    {jd_text[:3000]}
+    """
+
+    if not context.strip():
+        return (
+            f"I found the documents ({cv_file}, {jd_file}) but could not retrieve enough relevant content from them."
+        )
+
+    
+        
     messages = [
         {
             "role": "system",

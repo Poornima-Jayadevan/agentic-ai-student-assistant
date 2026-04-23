@@ -1,3 +1,5 @@
+# app/services/chat_execution_service.py
+
 from app.services.llm_service import (
     get_llm_response,
     summarize_with_llm,
@@ -8,7 +10,6 @@ from app.services.langchain_service import get_langchain_response
 from app.services.memory_service import (
     get_memory,
     add_message,
-    update_user_profile,
     get_user_profile,
 )
 from app.services.rag_service import (
@@ -27,256 +28,28 @@ from app.services.job_assistant_service import (
     generate_cover_letter,
     generate_interview_questions,
 )
+from app.services.agent_service import route_message
 
 
-def detect_document_command(message: str) -> dict | None:
+def build_chat_response(
+    mode: str,
+    reply: str,
+    source: str,
+    metadata: dict | None = None,
+    data: dict | None = None,
+    success: bool = True,
+) -> dict:
     """
-    Detect whether the user is asking for:
-    - full document summary
-    - section/chapter summary
-    - keyword search
+    Standard API response shape for chat routes.
     """
-    msg = message.strip().lower()
-
-    full_doc_phrases = {
-        "summarize this document",
-        "summarise this document",
-        "summarize document",
-        "summarise document",
-        "summarize my cv",
-        "summarise my cv",
-        "summarize this cv",
-        "summarise this cv",
-        "summarize cv",
-        "summarise cv",
-        "summarize my resume",
-        "summarise my resume",
-        "summarize this resume",
-        "summarise this resume",
-        "summarize resume",
-        "summarise resume",
-        "summarize uploaded document",
-        "summarise uploaded document",
-        "summarize this pdf",
-        "summarise this pdf",
-        "summarize pdf",
-        "summarise pdf",
+    return {
+        "success": success,
+        "mode": mode,
+        "reply": reply,
+        "source": source,
+        "metadata": metadata or {},
+        "data": data or {},
     }
-
-    # 1. Exact full-document summary requests
-    if msg in full_doc_phrases:
-        return {"type": "summarize_document"}
-
-    # 2. Section / chapter summary requests
-    # Put these BEFORE the broad "summarize ... document/pdf/cv" fallback
-    if msg.startswith("summarize the section "):
-        return {
-            "type": "summarize_section",
-            "section": message[len("summarize the section "):].strip(),
-        }
-
-    if msg.startswith("summarise the section "):
-        return {
-            "type": "summarize_section",
-            "section": message[len("summarise the section "):].strip(),
-        }
-
-    if msg.startswith("summarize the chapter "):
-        return {
-            "type": "summarize_section",
-            "section": message[len("summarize the chapter "):].strip(),
-        }
-
-    if msg.startswith("summarise the chapter "):
-        return {
-            "type": "summarize_section",
-            "section": message[len("summarise the chapter "):].strip(),
-        }
-
-    if msg.startswith("summarize chapter "):
-        return {
-            "type": "summarize_section",
-            "section": message[len("summarize chapter "):].strip(),
-        }
-
-    if msg.startswith("summarise chapter "):
-        return {
-            "type": "summarize_section",
-            "section": message[len("summarise chapter "):].strip(),
-        }
-
-    if msg.startswith("summarize section "):
-        return {
-            "type": "summarize_section",
-            "section": message[len("summarize section "):].strip(),
-        }
-
-    if msg.startswith("summarise section "):
-        return {
-            "type": "summarize_section",
-            "section": message[len("summarise section "):].strip(),
-        }
-
-    # Handles prompts like:
-    # "summarize education section"
-    # "summarize education section of the document"
-    # "summarize education section in the document"
-    if msg.startswith("summarize ") and " section" in msg:
-        cleaned = (
-            message[len("summarize "):]
-            .replace(" section of the document", "")
-            .replace(" section in the document", "")
-            .replace(" section of document", "")
-            .replace(" section in document", "")
-            .replace(" section", "")
-            .strip()
-        )
-        return {
-            "type": "summarize_section",
-            "section": cleaned,
-        }
-
-    if msg.startswith("summarise ") and " section" in msg:
-        cleaned = (
-            message[len("summarise "):]
-            .replace(" section of the document", "")
-            .replace(" section in the document", "")
-            .replace(" section of document", "")
-            .replace(" section in document", "")
-            .replace(" section", "")
-            .strip()
-        )
-        return {
-            "type": "summarize_section",
-            "section": cleaned,
-        }
-
-    # 3. Flexible full-document summary fallback
-    if msg.startswith("summarize ") or msg.startswith("summarise "):
-        if any(term in msg for term in [" cv", "resume", "document", "pdf"]):
-            return {"type": "summarize_document"}
-
-    # 4. Generic summarize fallback -> treat as section request
-    if msg.startswith("summarize "):
-        section_name = message[len("summarize "):].strip()
-        if section_name.lower() not in [
-            "this document",
-            "document",
-            "my cv",
-            "this cv",
-            "cv",
-            "my resume",
-            "this resume",
-            "resume",
-            "uploaded document",
-            "this pdf",
-            "pdf",
-        ]:
-            return {
-                "type": "summarize_section",
-                "section": section_name,
-            }
-
-    if msg.startswith("summarise "):
-        section_name = message[len("summarise "):].strip()
-        if section_name.lower() not in [
-            "this document",
-            "document",
-            "my cv",
-            "this cv",
-            "cv",
-            "my resume",
-            "this resume",
-            "resume",
-            "uploaded document",
-            "this pdf",
-            "pdf",
-        ]:
-            return {
-                "type": "summarize_section",
-                "section": section_name,
-            }
-
-    # 5. Keyword search
-    if msg.startswith("find mentions of "):
-        return {
-            "type": "keyword_search",
-            "keyword": message[len("find mentions of "):].strip(),
-        }
-
-    if msg.startswith("search for "):
-        return {
-            "type": "keyword_search",
-            "keyword": message[len("search for "):].strip(),
-        }
-
-    if msg.startswith("search "):
-        return {
-            "type": "keyword_search",
-            "keyword": message[len("search "):].strip(),
-        }
-
-    return None
-
-
-def detect_memory_update(message: str) -> dict | None:
-    """
-    Detect simple long-term memory updates like:
-    - I want to prepare for XAI interviews
-    - My exam is in 10 days
-    - My interview is in 7 days
-    """
-    msg = message.strip().lower()
-
-    if "i want to prepare for " in msg:
-        marker = "i want to prepare for "
-        start_index = msg.find(marker)
-        goal = message[start_index + len(marker):].strip()
-
-        if goal:
-            return {"study_goal": goal}
-
-    if "my exam is in " in msg and " days" in msg:
-        try:
-            days_part = msg.split("my exam is in ", 1)[1].split(" days", 1)[0].strip()
-            days = int(days_part)
-            return {"exam_days": str(days)}
-        except ValueError:
-            pass
-
-    if "my interview is in " in msg and " days" in msg:
-        try:
-            days_part = msg.split("my interview is in ", 1)[1].split(" days", 1)[0].strip()
-            days = int(days_part)
-            return {"exam_days": str(days)}
-        except ValueError:
-            pass
-
-    return None
-
-
-def detect_job_command(message: str) -> str | None:
-    """
-    Detect job assistant tasks.
-    """
-    msg = message.strip().lower()
-
-    if "summarize this job description" in msg or "summarise this job description" in msg:
-        return "summarize_job_description"
-
-    if "tailor my cv" in msg or "compare my cv with this job" in msg:
-        return "compare_cv_with_job"
-
-    if "what skills am i missing" in msg or "missing skills" in msg:
-        return "identify_missing_skills"
-
-    if "generate a cover letter" in msg or "write a cover letter" in msg:
-        return "generate_cover_letter"
-
-    if "interview questions" in msg or "prepare interview questions" in msg:
-        return "generate_interview_questions"
-
-    return None
 
 
 def format_tool_response(tool_result: dict) -> str:
@@ -311,201 +84,153 @@ def format_tool_response(tool_result: dict) -> str:
     return str(tool_result)
 
 
+def resolve_file_name(file_name: str) -> str:
+    """
+    Return the provided file_name if available.
+    Otherwise, fall back to the most recently available document.
+    """
+    if file_name:
+        return file_name
+
+    docs = list_documents()
+    if docs:
+        return docs[-1]
+
+    return ""
+
+
+def require_file_name(file_name: str) -> str:
+    """
+    Ensure a valid file_name is available for document-based operations.
+    """
+    resolved_file_name = resolve_file_name(file_name)
+
+    if not resolved_file_name:
+        raise ValueError("No document available. Please upload a PDF first.")
+
+    return resolved_file_name
+
+
 def execute_chat_flow(request, engine: str = "basic"):
     """
     Shared execution flow for:
     - /chat
     - /chat-langchain
 
-    Preserves all legacy functionality from the original chat.py.
+    Routing is decided by route_message().
+    Execution is handled here.
     """
     user_id = request.user_id
     user_message = request.message.strip()
     file_name = request.file_name.strip() if request.file_name else ""
 
-    # Store user message in short-term memory
     add_message(user_id, "user", user_message)
 
-    lower_msg = user_message.lower().strip()
+    agent_result = route_message(user_id, user_message)
+    route = agent_result.get("route")
+    agent_answer = agent_result.get("answer", "")
+    agent_source = agent_result.get("source", "agent")
+    agent_metadata = agent_result.get("metadata", {})
 
-    document_list_phrases = [
-        "what documents do i have",
-        "what files do i have",
-        "list documents",
-        "show documents",
-        "show uploaded documents",
-        "which documents are uploaded",
-        "list uploaded files",
-        "show my files",
-    ]
+    resolved_file_name = resolve_file_name(file_name)
 
-    if any(phrase in lower_msg for phrase in document_list_phrases):
-        docs = list_documents()
-        reply = (
-            "No documents are currently uploaded."
-            if not docs
-            else "Uploaded documents:\n" + "\n".join(f"- {doc}" for doc in docs)
+    # 1. Direct-return routes
+    if route in [
+        "memory",
+        "planner",
+        "calculator",
+        "document_list",
+        "document_search",
+        "comparison",
+        "interview_prep",
+    ]:
+        add_message(user_id, "assistant", agent_answer)
+
+        return build_chat_response(
+            mode=route,
+            reply=agent_answer,
+            source=agent_source,
+            metadata=agent_metadata,
         )
 
+    # 2. Job assistant routes
+    if route == "job_assistant":
+        task = agent_metadata.get("task")
+        required_file_name = require_file_name(resolved_file_name)
+
+        if task == "summarize_job_description":
+            reply = summarize_job_description(file_name=required_file_name)
+        elif task == "compare_cv_with_job":
+            reply = compare_cv_with_job(file_name=required_file_name)
+        elif task == "identify_missing_skills":
+            reply = identify_missing_skills(file_name=required_file_name)
+        elif task == "generate_cover_letter":
+            reply = generate_cover_letter(file_name=required_file_name)
+        elif task == "generate_interview_questions":
+            reply = generate_interview_questions(file_name=required_file_name)
+        else:
+            raise ValueError("Unknown job assistant task.")
+
         add_message(user_id, "assistant", reply)
 
-        return {
-            "mode": "document_list",
-            "reply": reply,
-            "documents": docs if docs else [],
-        }
-
-    # -----------------------------------
-    # 0. LONG-TERM MEMORY UPDATE DETECTION
-    # -----------------------------------
-    memory_update = detect_memory_update(user_message)
-    if memory_update:
-        update_user_profile(user_id, memory_update)
-
-        saved_items = ", ".join(
-            [f"{key}: {value}" for key, value in memory_update.items()]
+        return build_chat_response(
+            mode="job_assistant",
+            reply=reply,
+            source=agent_source,
+            metadata=agent_metadata,
+            data={
+                "task": task,
+                "file_name": required_file_name,
+            },
         )
-        reply = f"I saved this to memory: {saved_items}"
 
-        add_message(user_id, "assistant", reply)
+    # 3. Full document summarization
+    if route == "summarize_document":
+        required_file_name = require_file_name(resolved_file_name)
 
-        return {
-            "mode": "memory_update",
-            "memory": get_user_profile(user_id),
-            "reply": reply,
-        }
-
-    # -----------------------------
-    # 1. TOOL DETECTION
-    # -----------------------------
-    tool_result = detect_and_run_tool(user_message)
-
-    if tool_result:
-        reply = format_tool_response(tool_result)
-        add_message(user_id, "assistant", reply)
-
-        return {
-            "mode": "tool",
-            "tool_output": tool_result,
-            "reply": reply,
-        }
-
-    # -----------------------------
-    # 2. JOB ASSISTANT DETECTION
-    # -----------------------------
-    job_command = detect_job_command(user_message)
-
-    if job_command == "summarize_job_description":
-        reply = summarize_job_description(file_name=file_name)
-        add_message(user_id, "assistant", reply)
-
-        return {
-            "mode": "job_assistant",
-            "task": job_command,
-            "reply": reply,
-        }
-
-    if job_command == "compare_cv_with_job":
-        reply = compare_cv_with_job(file_name=file_name)
-        add_message(user_id, "assistant", reply)
-
-        return {
-            "mode": "job_assistant",
-            "task": job_command,
-            "reply": reply,
-        }
-
-    if job_command == "identify_missing_skills":
-        reply = identify_missing_skills(file_name=file_name)
-        add_message(user_id, "assistant", reply)
-
-        return {
-            "mode": "job_assistant",
-            "task": job_command,
-            "reply": reply,
-        }
-
-    if job_command == "generate_cover_letter":
-        reply = generate_cover_letter(file_name=file_name)
-        add_message(user_id, "assistant", reply)
-
-        return {
-            "mode": "job_assistant",
-            "task": job_command,
-            "reply": reply,
-        }
-
-    if job_command == "generate_interview_questions":
-        reply = generate_interview_questions(file_name=file_name)
-        add_message(user_id, "assistant", reply)
-
-        return {
-            "mode": "job_assistant",
-            "task": job_command,
-            "reply": reply,
-        }
-
-    # -----------------------------
-    # 3. DOCUMENT COMMAND DETECTION
-    # -----------------------------
-    command = detect_document_command(user_message)
-
-    # If file_name is not provided, try latest available processed doc
-    if not file_name:
-        docs = list_documents()
-        if docs:
-            file_name = docs[-1]
-
-    # -----------------------------
-    # 4. FULL DOCUMENT SUMMARIZATION
-    # -----------------------------
-    if command and command["type"] == "summarize_document":
-        if not file_name:
-            raise ValueError("No document available. Please upload a PDF first.")
-
-        doc_text = summarize_document(file_name)
+        doc_text = summarize_document(required_file_name)
 
         if not doc_text:
-            raise ValueError(f"Could not summarize document '{file_name}'.")
+            raise ValueError(f"Could not summarize document '{required_file_name}'.")
 
         summary = summarize_with_llm(doc_text)
-
         add_message(user_id, "assistant", summary)
 
-        return {
-            "mode": "summarize_document",
-            "file_name": file_name,
-            "reply": summary,
-        }
+        return build_chat_response(
+            mode="summarize_document",
+            reply=summary,
+            source=agent_source,
+            metadata=agent_metadata,
+            data={"file_name": required_file_name},
+        )
 
-    # -----------------------------
-    # 5. SECTION / CHAPTER SUMMARY
-    # -----------------------------
-    if command and command["type"] == "summarize_section":
-        if not file_name:
-            raise ValueError("No document available. Please upload a PDF first.")
-
-        result = summarize_section(file_name, command["section"])
+    # 4. Section summarization
+    if route == "summarize_section":
+        required_file_name = require_file_name(resolved_file_name)
+        section_name = agent_metadata.get("section", "")
+        result = summarize_section(required_file_name, section_name)
 
         if not result:
-            doc_text = summarize_document(file_name)
+            doc_text = summarize_document(required_file_name)
 
             if not doc_text:
-                raise ValueError(f"Could not summarize document '{file_name}'.")
+                raise ValueError(f"Could not summarize document '{required_file_name}'.")
 
             summary = summarize_with_llm(doc_text)
             final_reply = (
-                f"I couldn't find a matching section for '{command['section']}', "
+                f"I couldn't find a matching section for '{section_name}', "
                 f"so here is a summary of the full document instead.\n\n{summary}"
             )
 
             add_message(user_id, "assistant", final_reply)
 
-            return {
-                "mode": "summarize_document",
-                "file_name": file_name,
-                "reply": final_reply,
-            }
+            return build_chat_response(
+                mode="summarize_document",
+                reply=final_reply,
+                source=agent_source,
+                metadata=agent_metadata,
+                data={"file_name": required_file_name},
+            )
 
         summary = summarize_section_with_llm(
             section_title=result["title"],
@@ -513,64 +238,83 @@ def execute_chat_flow(request, engine: str = "basic"):
         )
 
         final_reply = f"**Summary of {result['title']}:**\n\n{summary}"
-
         add_message(user_id, "assistant", final_reply)
 
-        return {
-            "mode": "summarize_section",
-            "file_name": file_name,
-            "section": result["title"],
-            "reply": final_reply,
-        }
+        return build_chat_response(
+            mode="summarize_section",
+            reply=final_reply,
+            source=agent_source,
+            metadata=agent_metadata,
+            data={
+                "file_name": required_file_name,
+                "section": result["title"],
+            },
+        )
 
-    # -----------------------------
-    # 6. KEYWORD / DOCUMENT SEARCH
-    # -----------------------------
-    if command and command["type"] == "keyword_search":
-        keyword = command["keyword"]
+    # 5. Keyword search
+    if route == "keyword_search":
+        keyword = agent_metadata.get("keyword", "")
 
-        if file_name:
-            matches = search_document(file_name, keyword, max_results=5)
+        if resolved_file_name:
+            matches = search_document(resolved_file_name, keyword, max_results=5)
 
             if matches is None:
-                raise ValueError(f"Document '{file_name}' was not found.")
+                raise ValueError(f"Document '{resolved_file_name}' was not found.")
 
             reply = explain_search_results(keyword, matches)
-
             add_message(user_id, "assistant", reply)
 
-            return {
-                "mode": "keyword_search",
-                "file_name": file_name,
-                "keyword": keyword,
-                "reply": reply,
-                "matches": matches,
-            }
+            return build_chat_response(
+                mode="keyword_search",
+                reply=reply,
+                source=agent_source,
+                metadata=agent_metadata,
+                data={
+                    "file_name": resolved_file_name,
+                    "keyword": keyword,
+                    "matches": matches,
+                },
+            )
 
         matches = search_all_documents(keyword, max_results=5)
         reply = explain_search_results(keyword, matches)
-
         add_message(user_id, "assistant", reply)
 
-        return {
-            "mode": "keyword_search_all_documents",
-            "keyword": keyword,
-            "reply": reply,
-            "matches": matches,
-        }
+        return build_chat_response(
+            mode="keyword_search_all_documents",
+            reply=reply,
+            source=agent_source,
+            metadata=agent_metadata,
+            data={
+                "keyword": keyword,
+                "matches": matches,
+            },
+        )
 
-    # -----------------------------
-    # 7. NORMAL RAG / LLM QA
-    # -----------------------------
+    # 6. Tool fallback
+    tool_result = detect_and_run_tool(user_message)
+
+    if tool_result:
+        reply = format_tool_response(tool_result)
+        add_message(user_id, "assistant", reply)
+
+        return build_chat_response(
+            mode="tool",
+            reply=reply,
+            source="tool",
+            data={"tool_output": tool_result},
+        )
+
+    # 7. Normal RAG / LLM QA
     messages = get_memory(user_id)
 
     retrieved_chunks = []
     context = ""
 
-    if file_name:
+    if resolved_file_name:
         retrieved_chunks = retrieve_relevant_chunks(
             query=user_message,
-            file_name=file_name,
+            file_name=resolved_file_name,
             top_k=3,
         )
 
@@ -598,8 +342,7 @@ def execute_chat_flow(request, engine: str = "basic"):
             memory=messages,
         )
 
-        mode = "langchain_rag_qa" if file_name else "langchain_chat"
-
+        mode = "langchain_rag_qa" if resolved_file_name else "langchain_chat"
     else:
         reply = get_llm_response(
             messages,
@@ -607,14 +350,18 @@ def execute_chat_flow(request, engine: str = "basic"):
             user_profile=user_profile,
         )
 
-        mode = "rag_qa" if file_name else "chat"
+        mode = "rag_qa" if resolved_file_name else "chat"
 
     add_message(user_id, "assistant", reply)
 
-    return {
-        "mode": mode,
-        "file_name": file_name if file_name else None,
-        "reply": reply,
-        "retrieved_chunks": retrieved_chunks,
-        "memory": user_profile,
-    }
+    return build_chat_response(
+        mode=mode,
+        reply=reply,
+        source=agent_source if route == "rag" else "llm",
+        metadata=agent_metadata,
+        data={
+            "file_name": resolved_file_name if resolved_file_name else None,
+            "retrieved_chunks": retrieved_chunks,
+            "memory": user_profile,
+        },
+    )

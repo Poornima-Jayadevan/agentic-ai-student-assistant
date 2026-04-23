@@ -492,7 +492,7 @@ def retrieve_chunks_for_documents(
     query: str,
     file_names: List[str],
     top_k_per_doc: int = 3
-) -> List[Dict]:
+) -> List[Dict[str, Any]]:
     all_results = []
 
     for file_name in file_names:
@@ -502,18 +502,34 @@ def retrieve_chunks_for_documents(
                 file_name=file_name,
                 top_k=top_k_per_doc
             )
+
+            if not results:
+                continue
+
             for item in results:
-                item_copy = item.copy()
-                item_copy["file_name"] = file_name
-                all_results.append(item_copy)
-        except Exception:
+                # Case 1: chunk is already a dict
+                if isinstance(item, dict):
+                    item_copy = item.copy()
+                    item_copy["file_name"] = file_name
+                    all_results.append(item_copy)
+
+                # Case 2: chunk is plain text
+                elif isinstance(item, str):
+                    all_results.append({
+                        "text": item,
+                        "score": 0,
+                        "file_name": file_name,
+                    })
+
+        except Exception as e:
+            print(f"Error retrieving chunks for {file_name}: {e}")
             continue
 
     all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
     return all_results
 
 
-def build_multi_doc_context(results: List[Dict], max_chars: int = 5000) -> str:
+def build_multi_doc_context(results: List[Dict[str, Any]], max_chars: int = 5000) -> str:
     if not results:
         return ""
 
@@ -521,10 +537,14 @@ def build_multi_doc_context(results: List[Dict], max_chars: int = 5000) -> str:
     total_len = 0
 
     for item in results:
-        text = item.get("text", "").strip()
+        text = str(item.get("text", "")).strip()
         file_name = item.get("file_name", "unknown")
 
+        if not text:
+            continue
+
         block = f"[Document: {file_name}]\n{text}\n"
+
         if total_len + len(block) > max_chars:
             break
 
