@@ -14,7 +14,7 @@ def is_calculation_query(message: str) -> bool:
         "evaluate"
     ]
 
-    math_pattern = r"^[\d\s\+\-\*\/\%\(\)\.]+$"
+    math_pattern = r"^\s*\d+(\.\d+)?\s*[\+\-\*\/\%]\s*\d+(\.\d+)?\s*$"
 
     if re.match(math_pattern, msg):
         return True
@@ -74,13 +74,53 @@ def extract_study_plan_details(message: str):
     return subject, days
 
 
+def build_tool_result(
+    tool: str,
+    success: bool = True,
+    result=None,
+    error: str = "",
+    metadata: dict | None = None,
+    **extra
+) -> dict:
+    return {
+        "success": success,
+        "tool": tool,
+        "result": result,
+        "error": error,
+        "metadata": metadata or {},
+        **extra
+    }
+
+
 def detect_and_run_tool(message: str):
-    if is_calculation_query(message):
-        expression = extract_expression(message)
-        return calculate_expression(expression)
+    try:
+        if is_calculation_query(message):
+            expression = extract_expression(message)
+            result = calculate_expression(expression)
 
-    if is_study_plan_query(message):
-        subject, days = extract_study_plan_details(message)
-        return generate_study_plan(subject, days)
+            return build_tool_result(
+                tool="calculator",
+                result=result,
+                input=expression,
+            )
 
-    return None
+        if is_study_plan_query(message):
+            subject, days = extract_study_plan_details(message)
+            plan = generate_study_plan(subject, days)
+
+            return build_tool_result(
+                tool="study_plan",
+                result=plan,
+                subject=subject,
+                days=days,
+                plan=plan,
+            )
+
+        return None
+
+    except Exception as e:
+        return build_tool_result(
+            tool="unknown",
+            success=False,
+            error=str(e),
+        )

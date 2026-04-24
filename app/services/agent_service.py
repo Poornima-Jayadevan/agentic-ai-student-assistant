@@ -496,7 +496,7 @@ def route_message(user_id: str, message: str) -> dict:
         return build_route_result(
             route="planner",
             answer=plan,
-            source="agent",
+            source="planner",
             metadata={
                 "profile_used": profile
             }

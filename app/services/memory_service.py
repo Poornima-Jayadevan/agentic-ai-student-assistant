@@ -24,10 +24,13 @@ def get_memory(user_id: str, limit: int = 10) -> List[dict]:
     return chat_memory.get(user_id, [])[-limit:]
 
 
-def add_message(user_id: str, role: str, content: str):
+def add_message(user_id: str, role: str, content: str, max_messages: int = 20):
     """
-    Add a message to the user's chat history.
+    Add a message to the user's chat history and keep only the latest messages.
     """
+    if role not in ["user", "assistant", "system"]:
+        raise ValueError("Invalid role. Use 'user', 'assistant', or 'system'.")
+
     if user_id not in chat_memory:
         chat_memory[user_id] = []
 
@@ -35,6 +38,9 @@ def add_message(user_id: str, role: str, content: str):
         "role": role,
         "content": content
     })
+
+    # Keep memory from growing forever
+    chat_memory[user_id] = chat_memory[user_id][-max_messages:]
 
 
 def clear_memory(user_id: str):
