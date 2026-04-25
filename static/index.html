@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Student Assistant Chatbot</title>
+  <title>AI Student Assistant</title>
 
   <style>
     * {
@@ -12,16 +12,14 @@
 
     :root {
       --bg: #eef2f7;
-      --panel: rgba(255, 255, 255, 0.92);
+      --panel: rgba(255, 255, 255, 0.94);
       --panel-strong: #ffffff;
-      --panel-soft: #f8fafc;
       --border: #dbe3ec;
       --border-strong: #cfd9e4;
       --text: #18212f;
       --muted: #64748b;
       --blue: #3b82f6;
       --blue-dark: #2563eb;
-      --blue-soft: #e8f1ff;
       --red: #ef4444;
       --red-dark: #dc2626;
       --chip-bg: #f3f6fa;
@@ -35,8 +33,6 @@
       --shadow-md: 0 18px 40px rgba(15, 23, 42, 0.10);
       --radius-xl: 22px;
       --radius-lg: 18px;
-      --radius-md: 14px;
-      --radius-sm: 10px;
     }
 
     html, body {
@@ -46,21 +42,20 @@
     body {
       font-family: Inter, Arial, sans-serif;
       background:
-        radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 28%),
-        radial-gradient(circle at top right, rgba(99, 102, 241, 0.06), transparent 24%),
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 28%),
+        radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 24%),
         var(--bg);
       margin: 0;
       padding: 18px;
-      min-height: 100vh;
       color: var(--text);
     }
 
     .app-shell {
-      width: min(98vw, 1280px);
+      width: min(98vw, 1600px);
       height: calc(100vh - 36px);
       margin: 0 auto;
       display: grid;
-      grid-template-columns: 300px 1fr;
+      grid-template-columns: 320px 1fr;
       gap: 18px;
       transition: grid-template-columns 0.25s ease, gap 0.25s ease;
     }
@@ -92,16 +87,10 @@
       overflow: hidden;
     }
 
-    .sidebar-top {
-      padding: 4px 2px 2px;
-    }
-
     .sidebar-title {
       font-size: 20px;
       font-weight: 800;
-      color: var(--text);
       margin-bottom: 4px;
-      letter-spacing: -0.02em;
     }
 
     .sidebar-subtitle {
@@ -145,7 +134,7 @@
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
+      transition: 0.18s ease;
     }
 
     .sidebar-btn:hover,
@@ -177,11 +166,6 @@
       color: var(--text);
       width: 100%;
       outline: none;
-    }
-
-    .upload-row select:focus {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.10);
     }
 
     .file-preview {
@@ -219,10 +203,8 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      min-width: 0;
       max-width: 150px;
       font-weight: 600;
-      color: var(--text);
     }
 
     .file-type-badge {
@@ -268,13 +250,23 @@
     .chat-header {
       background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
       color: white;
-      padding: 18px 22px;
-      font-size: 22px;
+      padding: 15px 22px;
       text-align: center;
-      font-weight: 800;
-      letter-spacing: -0.02em;
       flex-shrink: 0;
       position: relative;
+    }
+
+    .chat-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .chat-subtitle {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-top: 3px;
+      font-weight: 500;
     }
 
     .sidebar-toggle-btn {
@@ -290,7 +282,6 @@
       font-size: 13px;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.18s ease, transform 0.18s ease;
     }
 
     .sidebar-toggle-btn:hover {
@@ -312,17 +303,17 @@
     .message-wrapper {
       display: flex;
       flex-direction: column;
-      max-width: 80%;
+      max-width: 88%;
       animation: fadeInUp 0.22s ease;
     }
 
-    .message-wrapper.user-wrapper {
+    .user-wrapper {
       align-self: flex-end;
       margin-left: auto;
       align-items: flex-end;
     }
 
-    .message-wrapper.bot-wrapper {
+    .bot-wrapper {
       align-self: flex-start;
       margin-right: auto;
       align-items: flex-start;
@@ -376,6 +367,12 @@
       border-color: #ccefff;
     }
 
+    .badge-error {
+      background: #fff1f2;
+      color: #b91c1c;
+      border-color: #fecdd3;
+    }
+
     .message {
       padding: 13px 15px;
       border-radius: 18px;
@@ -383,7 +380,7 @@
       word-wrap: break-word;
       overflow-wrap: anywhere;
       line-height: 1.6;
-      font-size: 14px;
+      font-size: 14.5px;
       border: 1px solid transparent;
     }
 
@@ -411,11 +408,7 @@
     }
 
     .bot-message strong {
-      font-weight: 700;
-    }
-
-    .bot-message em {
-      color: #334155;
+      font-weight: 800;
     }
 
     .bot-message ul,
@@ -434,7 +427,6 @@
     .bot-message h4 {
       margin: 0 0 10px 0;
       line-height: 1.35;
-      letter-spacing: -0.01em;
     }
 
     .bot-message h1 { font-size: 20px; }
@@ -481,7 +473,7 @@
 
     .chat-footer {
       border-top: 1px solid var(--border);
-      background: rgba(255,255,255,0.88);
+      background: rgba(255,255,255,0.9);
       padding: 14px;
       flex-shrink: 0;
       backdrop-filter: blur(10px);
@@ -499,10 +491,10 @@
 
     .input-wrapper {
       flex: 1;
-      min-width: 0;
       display: flex;
       flex-direction: column;
       gap: 6px;
+      min-width: 0;
     }
 
     #activeDocLabel {
@@ -513,7 +505,7 @@
       font-weight: 600;
     }
 
-    .composer textarea {
+    textarea {
       width: 100%;
       min-height: 46px;
       max-height: 120px;
@@ -529,7 +521,7 @@
       color: var(--text);
     }
 
-    .composer textarea:focus {
+    textarea:focus {
       border-color: var(--blue);
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.10);
     }
@@ -544,7 +536,7 @@
       border-radius: 14px;
       color: white;
       flex-shrink: 0;
-      transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.18s ease;
+      transition: 0.18s ease;
       min-width: 82px;
       height: 46px;
     }
@@ -554,22 +546,20 @@
       transform: translateY(-1px);
     }
 
+    .primary-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
     .primary-btn {
       background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
       box-shadow: 0 10px 18px rgba(37, 99, 235, 0.20);
     }
 
-    .primary-btn:hover {
-      background: linear-gradient(135deg, #3678ec 0%, #1f5de0 100%);
-    }
-
     .danger-btn {
       background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
       box-shadow: 0 10px 18px rgba(220, 38, 38, 0.18);
-    }
-
-    .danger-btn:hover {
-      background: linear-gradient(135deg, #e53b3b 0%, #c61e1e 100%);
     }
 
     @keyframes bounce {
@@ -598,15 +588,10 @@
       .app-shell {
         grid-template-columns: 1fr;
         height: auto;
-        gap: 0;
       }
 
       .sidebar {
         order: 2;
-        max-height: none;
-        border-radius: 0 0 18px 18px;
-        box-shadow: none;
-        border-top: 1px solid var(--border);
       }
 
       .chat-container {
@@ -634,8 +619,15 @@
       }
 
       .chat-header {
-        font-size: 19px;
-        padding: 16px 56px 16px 56px;
+        padding: 14px 56px;
+      }
+
+      .chat-title {
+        font-size: 18px;
+      }
+
+      .chat-subtitle {
+        font-size: 11px;
       }
 
       .chat-box {
@@ -652,21 +644,22 @@
 
       .input-wrapper {
         width: 100%;
-        order: 2;
+        order: 1;
       }
 
       .primary-btn,
       .danger-btn {
         flex: 1;
-        order: 3;
+        order: 2;
       }
     }
   </style>
 </head>
+
 <body>
   <div class="app-shell" id="appShell">
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-top">
+      <div>
         <div class="sidebar-title">Assistant Tools</div>
         <div class="sidebar-subtitle">Study support, document actions, and job assistant shortcuts</div>
       </div>
@@ -674,16 +667,16 @@
       <div class="sidebar-block">
         <div class="block-title">Document Actions</div>
         <div class="sidebar-actions">
-          <button class="sidebar-btn" onclick="quickSummarize()">Summarize document</button>
-          <button class="sidebar-btn" onclick="quickSearch()">Search in document</button>
-          <button class="sidebar-btn" onclick="quickAsk()">Ask from document</button>
+          <button class="sidebar-btn" onclick="quickSummarize()">📄 Summarize document</button>
+          <button class="sidebar-btn" onclick="quickSearch()">🔍 Search in document</button>
+          <button class="sidebar-btn" onclick="quickAsk()">💬 Ask from document</button>
         </div>
       </div>
 
       <div class="sidebar-block">
         <div class="block-title">Job Assistant</div>
         <div class="sidebar-actions">
-          <button class="sidebar-btn" onclick="sendQuickPrompt('compare my CV with this job')">📊 Compare CV</button>
+          <button class="sidebar-btn" onclick="sendQuickPrompt('compare my CV with this job description')">📊 Compare CV</button>
           <button class="sidebar-btn" onclick="sendQuickPrompt('what skills am I missing?')">❗ Missing Skills</button>
           <button class="sidebar-btn" onclick="sendQuickPrompt('generate a cover letter')">✍️ Generate Cover Letter</button>
           <button class="sidebar-btn" onclick="sendQuickPrompt('prepare interview questions')">🎯 Interview Prep</button>
@@ -693,8 +686,8 @@
       <div class="sidebar-block">
         <div class="block-title">Output</div>
         <div class="sidebar-actions">
-          <button class="sidebar-btn" onclick="copyLastAssistantMessage()">Copy Output</button>
-          <button class="sidebar-btn" onclick="downloadLastAssistantMessage()">Download Output</button>
+          <button class="sidebar-btn" onclick="copyLastAssistantMessage()">📋 Copy Output</button>
+          <button class="sidebar-btn" onclick="downloadLastAssistantMessage()">⬇️ Download Output</button>
         </div>
       </div>
 
@@ -733,13 +726,18 @@
     <main class="chat-container">
       <div class="chat-header">
         <button id="toggleSidebarBtn" class="sidebar-toggle-btn" onclick="toggleSidebar()">☰ Hide Tools</button>
-        <span>Student Assistant Chatbot</span>
+        <div class="chat-title">AI Student Assistant</div>
+        <div class="chat-subtitle">LLM + RAG + Tools + Job Assistant</div>
       </div>
 
       <div class="chat-box" id="chatBox">
         <div class="message-wrapper bot-wrapper">
           <div class="message-badge badge-system">Assistant</div>
-          <div class="message bot-message">Hello! Ask me something.</div>
+          <div class="message bot-message">
+            <p><strong>Hi! I’m your AI Student Assistant.</strong></p>
+            <p>I can help with study questions, PDF summaries, document search, CV comparison, cover letters, and interview prep.</p>
+            <p>Upload a PDF or ask me something to get started.</p>
+          </div>
         </div>
       </div>
 
@@ -754,7 +752,7 @@
             ></textarea>
           </div>
 
-          <button class="primary-btn" onclick="sendMessage()">Send</button>
+          <button class="primary-btn" id="sendBtn" onclick="sendMessage()">Send</button>
           <button class="danger-btn" onclick="clearChat()">Clear</button>
         </div>
       </div>
@@ -766,6 +764,7 @@
     let selectedFile = null;
     let activeFileName = null;
     let lastAssistantMessage = "";
+    let isLoading = false;
 
     function toggleSidebar() {
       const appShell = document.getElementById("appShell");
@@ -933,12 +932,23 @@
       return filename.replace(/\.pdf$/i, "");
     }
 
+    function cleanDisplayName(filename) {
+      if (!filename) return "";
+
+      return filename
+        .replace(/_\d+$/, "")      // remove ending _23
+        .replace(/__\d+$/, "")     // remove ending __1
+        .replace(/\.pdf$/i, "")    // remove pdf
+        .replace(/_/g, " ");       // optional: underscores -> spaces
+    }
+
     function updateActiveDocLabel() {
       const activeDocLabel = document.getElementById("activeDocLabel");
 
       if (activeFileName) {
         activeDocLabel.style.display = "block";
-        activeDocLabel.textContent = `Active document: ${activeFileName}`;
+        activeDocLabel.textContent =
+          "Active document: " + cleanDisplayName(activeFileName);
       } else {
         activeDocLabel.style.display = "none";
         activeDocLabel.textContent = "";
@@ -973,25 +983,40 @@
       document.getElementById("fileName").textContent = "";
     }
 
-    function getModeBadge(mode) {
-      if (mode === "summarize_document" || mode === "summarize_section") {
+    function getModeBadge(mode, source) {
+      const value = (mode || source || "").toLowerCase();
+
+      if (value.includes("summarize")) {
         return { label: "Summary", className: "badge-summary" };
       }
 
-      if (mode === "keyword_search" || mode === "keyword_search_all_documents") {
+      if (value.includes("search") || value.includes("keyword")) {
         return { label: "Search", className: "badge-search" };
       }
 
-      if (mode === "rag_qa") {
+      if (value.includes("rag")) {
         return { label: "RAG Answer", className: "badge-rag" };
       }
 
-      if (mode === "tool") {
+      if (value.includes("tool") || value.includes("calculator")) {
         return { label: "Tool", className: "badge-tool" };
       }
 
-      if (mode === "job_assistant") {
+      if (
+        value.includes("job") ||
+        value.includes("comparison") ||
+        value.includes("interview") ||
+        value.includes("cover")
+      ) {
         return { label: "Job Assistant", className: "badge-job" };
+      }
+
+      if (value.includes("planner")) {
+        return { label: "Planner", className: "badge-system" };
+      }
+
+      if (value.includes("memory")) {
+        return { label: "Memory", className: "badge-system" };
       }
 
       return { label: "Assistant", className: "badge-system" };
@@ -1051,7 +1076,7 @@
 
       const badge = document.createElement("div");
       badge.className = "message-badge badge-system";
-      badge.textContent = "Assistant";
+      badge.textContent = "Thinking";
 
       const typingDiv = document.createElement("div");
       typingDiv.className = "message bot-message typing-message";
@@ -1109,8 +1134,8 @@
       }
 
       navigator.clipboard.writeText(lastAssistantMessage)
-        .then(() => alert("Copied to clipboard"))
-        .catch(() => alert("Could not copy output"));
+        .then(() => alert("Copied to clipboard."))
+        .catch(() => alert("Could not copy output."));
     }
 
     function downloadLastAssistantMessage() {
@@ -1133,13 +1158,24 @@
     }
 
     async function sendMessage() {
+      if (isLoading) return;
+
       const input = document.getElementById("userInput");
+      const sendBtn = document.getElementById("sendBtn");
       const message = input.value.trim();
       const documentType = document.getElementById("documentType").value;
 
-      if (!message && !selectedFile && !activeFileName) {
+      if (!message && !selectedFile) {
+        addMessage("Please type a message or upload a PDF first.", "bot-message", false, {
+          label: "Input Needed",
+          className: "badge-error"
+        });
         return;
       }
+
+      isLoading = true;
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Sending...";
 
       if (selectedFile) {
         addMessage("📎 " + selectedFile.name, "user-message");
@@ -1159,6 +1195,17 @@
         if (selectedFile) {
           const uploadInfo = await uploadPDF(selectedFile, documentType);
           activeFileName = uploadInfo.file_name || getBaseFileName(selectedFile.name);
+
+          addMessage(
+            `Uploaded successfully: ${cleanDisplayName(activeFileName)}`,
+            "bot-message",
+            false,
+            {
+              label: "Upload",
+              className: "badge-rag"
+            }
+          );
+
           removeSelectedFile();
           updateActiveDocLabel();
         }
@@ -1187,10 +1234,10 @@
           throw new Error(data.detail || "Chat request failed.");
         }
 
-        const replyText = data.reply || "No response received.";
+        const replyText = data.reply || data.answer || "No response received.";
         lastAssistantMessage = replyText;
 
-        const badge = getModeBadge(data.mode);
+        const badge = getModeBadge(data.mode, data.source);
         addMessage(formatResponse(replyText), "bot-message", true, badge);
 
       } catch (error) {
@@ -1199,12 +1246,15 @@
         }
 
         addMessage("Error: " + error.message, "bot-message", false, {
-          label: "Assistant",
-          className: "badge-system"
+          label: "Error",
+          className: "badge-error"
         });
+      } finally {
+        isLoading = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Send";
+        chatBox.scrollTop = chatBox.scrollHeight;
       }
-
-      chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     async function clearChat() {
@@ -1221,19 +1271,23 @@
         updateActiveDocLabel();
 
         chatBox.innerHTML = "";
-        addMessage("Chat cleared. Ask me something new.", "bot-message", false, {
-          label: "Assistant",
-          className: "badge-system"
-        });
+
+        addMessage(
+          "Chat cleared. You can upload a new document or ask a new question.",
+          "bot-message",
+          false,
+          {
+            label: "Assistant",
+            className: "badge-system"
+          }
+        );
 
       } catch (error) {
         addMessage("Could not clear chat.", "bot-message", false, {
-          label: "Assistant",
-          className: "badge-system"
+          label: "Error",
+          className: "badge-error"
         });
       }
-
-      chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     const userInput = document.getElementById("userInput");
