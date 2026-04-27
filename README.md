@@ -1,6 +1,10 @@
 # Agentic AI Student Assistant
 
-An Agentic AI assistant built with FastAPI, Ollama, FAISS, and Sentence Transformers that supports:
+An intelligent **Agentic AI assistant** built with **FastAPI, Ollama, LangChain, FAISS, and Sentence Transformers**.
+
+This project demonstrates practical **LLM application development**, **Retrieval-Augmented Generation (RAG)**, **backend engineering**, and **AI workflow orchestration** through a real-world portfolio application.
+
+The assistant supports:
 
 - Conversational AI chat
 - PDF upload and document understanding
@@ -9,41 +13,53 @@ An Agentic AI assistant built with FastAPI, Ollama, FAISS, and Sentence Transfor
 - Document summarization
 - CV vs Job Description comparison
 - Cover letter generation
-- Interview preparation prompts
-
-This project was built as a portfolio project to demonstrate practical **LLM application development**, **backend engineering**, and **RAG system design**.
+- Interview preparation
+- Study planning workflows
 
 ---
 
 # Features
 
-## Core Chatbot
-- Chat with an LLM through FastAPI backend
-- Short-term conversation memory
-- Multi-turn conversation support
+## Core AI Chatbot
+
+- Conversational AI powered by local LLMs
+- Multi-turn chat support
+- Short-term memory for contextual responses
+- Intelligent task routing across workflows
 
 ## Document Intelligence
+
 - Upload PDF files
 - Extract text from PDFs
-- Chunk long documents
-- Generate embeddings
-- Store vectors in FAISS
+- Automatic text chunking
+- Generate vector embeddings
+- Store embeddings in FAISS vector database
 - Ask questions from uploaded documents
-- Summarize documents
-- Search documents semantically
+- Semantic document retrieval
+- Full document summarization
 
-## Job Assistant
+## Career Assistant
+
 - Compare CV with Job Description
-- Find missing skills
-- Generate cover letters
-- Prepare interview questions
+- Detect missing skills
+- Generate tailored cover letters
+- Create interview questions
+- Interview preparation prompts
 
-## UI
-- Clean chat interface
+## Productivity Tools
+
+- Study planner generation
+- Calculator tool
+- Personalized assistance workflows
+
+## Frontend UI
+
+- Responsive chat interface
 - Sidebar tools
 - Typing animation
 - Message badges
 - File preview before upload
+- Active document workflow support
 
 ---
 
@@ -53,18 +69,20 @@ This project was built as a portfolio project to demonstrate practical **LLM app
 |------|------------|
 | Backend | FastAPI |
 | LLM | Ollama (Llama 3) |
+| Framework | LangChain |
 | Embeddings | Sentence Transformers |
 | Vector Store | FAISS |
 | PDF Parsing | PyPDF |
 | Frontend | HTML, CSS, JavaScript |
 | Language | Python |
 
+
 ---
 
 # Project Structure
 
 ```bash
-project/
+agentic-ai-student-assistant/
 │── app/
 │   ├── main.py
 │   ├── routes/
@@ -77,8 +95,13 @@ project/
 │
 │── data/
 │   ├── uploads/
-│   └── vectorstore/
+│   ├── chunks/
+│   ├── vectorstore/
+│   └── memory/
 │
+│── screenshots/
+│── requirements.txt
+│── Dockerfile
 │── README.md
 ```
 
@@ -86,16 +109,36 @@ project/
 
 # Architecture
 
-## Flow
+```text
+Frontend UI
+   ↓
+FastAPI Backend
+   ↓
+Agent Router
+ ├── Chat Engine
+ ├── RAG Engine
+ ├── Tool Router
+ ├── Planner
+ ├── CV Comparison Agent
+ └── Interview Prep Agent
+   ↓
+FAISS Vector Store
+   ↓
+Local LLM (Ollama + Llama 3)
+```
+
+---
+
+# RAG Workflow
 
 1. User uploads PDF  
 2. Text extracted using PyPDF  
-3. Text split into chunks  
-4. Embeddings created  
-5. Stored in FAISS vector DB  
-6. User asks question  
+3. Document split into chunks  
+4. Embeddings generated  
+5. Stored in FAISS vector database  
+6. User submits question  
 7. Relevant chunks retrieved  
-8. LLM generates final answer  
+8. LLM generates final contextual response  
 
 ---
 
@@ -178,27 +221,42 @@ http://127.0.0.1:8000/docs
 
 ---
 
+ Example Use Cases
+
+- “Summarize this PDF”
+- “Compare my CV with this job description”
+- “Generate a cover letter for this role”
+- “Prepare interview questions for Python Developer”
+- “Create a study plan for my exams”
+- “Search this uploaded document”
+
+---
+
 # Future Improvements
 
 - User authentication
-- Database-backed memory
+- Persistent database-backed memory
 - Multiple user accounts
-- Better ranking / reranking
 - Streaming responses
+- Better ranking / reranking
+- Cloud deployment
 - React frontend
-- Deployment to cloud
+- Voice assistant support
 
 ---
 
 # Why I Built This
 
-I built this project to learn how real-world AI assistants are developed using:
 
-- LLM APIs
+I built this project to understand how modern AI assistants are designed in production environments using:
+
+- Large Language Models (LLMs)
 - Retrieval systems
 - Semantic search
 - FastAPI backend architecture
-- Production-ready project structure
+- Modular service design
+- Agentic workflows
+- Real-world AI product development
 
 ---
 
